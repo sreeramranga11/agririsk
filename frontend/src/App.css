@@ -1,3 +1,11 @@
+body {
+  font-family: 'Inter', 'Roboto', 'Lato', Arial, sans-serif;
+  background: linear-gradient(120deg, #f8fafc 0%, #e3eafc 100%);
+  margin: 0;
+  min-height: 100vh;
+  color: #1a2236;
+}
+
 .App {
   text-align: center;
 }
@@ -34,5 +42,88 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  background: #e3eafc;
+}
+::-webkit-scrollbar-thumb {
+  background: #b0b8d1;
+  border-radius: 8px;
+}
+
+.MuiCard-root {
+  border-radius: 18px !important;
+  box-shadow: 0 4px 24px 0 rgba(26,34,54,0.08), 0 1.5px 6px 0 rgba(26,34,54,0.04);
+  background: rgba(255,255,255,0.7) !important;
+  backdrop-filter: blur(8px);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.MuiCard-root:hover {
+  box-shadow: 0 8px 32px 0 rgba(26,34,54,0.16), 0 3px 12px 0 rgba(26,34,54,0.08);
+  transform: translateY(-2px) scale(1.02);
+}
+
+.MuiButton-root {
+  border-radius: 12px !important;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 8px 0 rgba(26,34,54,0.08);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.MuiButton-root:hover {
+  background: linear-gradient(90deg, #233044 0%, #1a2236 100%) !important;
+  box-shadow: 0 4px 16px 0 rgba(26,34,54,0.12);
+}
+
+.MuiAppBar-root {
+  background: rgba(26,34,54,0.95) !important;
+  box-shadow: 0 2px 12px 0 rgba(26,34,54,0.10);
+  border-bottom: 1.5px solid #e3eafc;
+}
+
+.MuiTypography-h4, .MuiTypography-h5, .MuiTypography-h6 {
+  font-family: 'Inter', 'Roboto', 'Lato', Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Glassmorphism for dashboard */
+.dashboard-glass {
+  background: rgba(255,255,255,0.7);
+  box-shadow: 0 8px 32px 0 rgba(26,34,54,0.12);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  padding: 32px 24px;
+}
+
+/* Map container polish */
+.leaflet-container {
+  border-radius: 18px;
+  box-shadow: 0 4px 24px 0 rgba(26,34,54,0.10);
+  border: 1.5px solid #e3eafc;
+}
+
+/* Hotspot marker */
+.hotspot-marker {
+  font-family: 'Inter', 'Roboto', 'Lato', Arial, sans-serif;
+  font-weight: 700;
+  background: #d32f2f;
+  color: white;
+  border-radius: 8px;
+  padding: 2px 10px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px 0 rgba(211,47,47,0.18);
+}
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .dashboard-glass {
+    padding: 18px 6px;
+  }
+  .MuiCard-root {
+    min-width: 120px !important;
   }
 }

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { MapContainer, TileLayer, FeatureGroup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, GeoJSON, Marker, useMapEvents } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -11,11 +11,15 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
-import AgricultureIcon from '@mui/icons-material/Agriculture';
+import mockClaims from './mock_claims.json';
+import logo from './logo.png';
 
 interface RiskResult {
   risk_score: number;
   premium: number;
+  perils: Record<string, number>;
+  peril_premiums: Record<string, number>;
+  explanations: Record<string, string>;
   report: Record<string, any>;
 }
 
@@ -24,6 +28,15 @@ interface CaseData {
   polygon: any | null;
   riskResult: RiskResult | null;
   created: string;
+}
+
+// Add Claim type
+interface Claim {
+  caseName: string;
+  date: string;
+  amount: number;
+  peril: string;
+  notes?: string;
 }
 
 const BACKEND_URL = 'http://localhost:8000/risk';
@@ -68,16 +81,124 @@ const MapWithDraw = ({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any)
           onDeleted={() => {
             onPolygonDraw(null);
           }}
+          onEdited={(e: any) => {
+            const layers = e.layers.getLayers();
+            if (layers.length > 0) {
+              const geojson = layers[0].toGeoJSON();
+              onPolygonDraw(geojson);
+            }
+          }}
         />
       </FeatureGroup>
       {latlng && (
-        <Box sx={{ position: 'absolute', bottom: 16, right: 16, bgcolor: 'white', p: 1, borderRadius: 1, boxShadow: 2, zIndex: 1000 }}>
+        <Box sx={{ position: 'absolute', top: 75, left: 11, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)', border: '1px solid rgba(26,34,54,0.08)', p: 1, borderRadius: 1, boxShadow: 2, zIndex: 1000 }}>
           <Typography variant="caption">Lat: {latlng.lat.toFixed(5)}, Lon: {latlng.lng.toFixed(5)}</Typography>
         </Box>
       )}
     </>
   );
 };
+
+function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim }: { cases: CaseData[], onNewCase: () => void, claims: Claim[], onNewClaim: () => void }) {
+  // Calculate total insured value
+  const totalInsured = cases.reduce((sum, c) => sum + (c.riskResult?.premium || 0), 0);
+  // Aggregate risk exposure by peril
+  const perilExposure: Record<string, number> = {};
+  cases.forEach(c => {
+    if (c.riskResult && c.riskResult.peril_premiums) {
+      Object.entries(c.riskResult.peril_premiums).forEach(([peril, premium]) => {
+        perilExposure[peril] = (perilExposure[peril] || 0) + premium;
+      });
+    }
+  });
+  // Hotspot polygons: high risk_score
+  const hotspots = cases.filter(c => c.riskResult && c.riskResult.risk_score > 0.6 && c.polygon);
+  // Recent claims (mock)
+  const recentClaims = claims.slice(-5).reverse();
+  return (
+    <Box className="dashboard-glass" sx={{ width: '100%', minHeight: '100vh', py: 4, px: { xs: 1, md: 4 }, fontFamily: 'inherit', boxSizing: 'border-box', margin: '0 auto', maxWidth: 1200 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a2236', letterSpacing: 0.5 }}>Portfolio Dashboard</Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            sx={{ background: 'linear-gradient(90deg, #1a2236 0%, #233044 100%)', color: 'white', borderRadius: 2, fontWeight: 600, boxShadow: 2, fontSize: 18, px: 3, py: 1.2 }}
+            onClick={onNewCase}
+          >
+            New Case
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<AddIcon />}
+            sx={{ borderRadius: 2, fontWeight: 600, fontSize: 18, px: 3, py: 1.2, borderColor: '#1a2236', color: '#1a2236' }}
+            onClick={onNewClaim}
+          >
+            New Claim
+          </Button>
+        </Box>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', mb: 4, justifyContent: 'center' }}>
+        <Card sx={{ minWidth: 240, p: 3, bgcolor: '#fff', borderRadius: 3, boxShadow: '0 2px 16px 0 rgba(26,34,54,0.08)', border: '1.5px solid #e3eafc', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <CardContent sx={{ p: 0 }}>
+            <Typography variant="subtitle2" sx={{ color: '#6b7280', fontWeight: 500, mb: 1, letterSpacing: 0.2 }}>Total Insured Value</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a2236', mb: 0.5 }}>${totalInsured.toLocaleString()}</Typography>
+          </CardContent>
+        </Card>
+        <Card sx={{ minWidth: 240, p: 3, bgcolor: '#fff', borderRadius: 3, boxShadow: '0 2px 16px 0 rgba(26,34,54,0.08)', border: '1.5px solid #e3eafc', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <CardContent sx={{ p: 0 }}>
+            <Typography variant="subtitle2" sx={{ color: '#6b7280', fontWeight: 500, mb: 1, letterSpacing: 0.2 }}>Risk Exposure by Peril</Typography>
+            <Box component="ul" sx={{ m: 0, pl: 2, color: '#1a2236', fontSize: 16 }}>
+              {Object.entries(perilExposure).map(([peril, value]) => (
+                <li key={peril} style={{ marginBottom: 2 }}><b>{peril.charAt(0).toUpperCase() + peril.slice(1)}:</b> ${value.toLocaleString()}</li>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+        <Card sx={{ minWidth: 240, p: 3, bgcolor: '#fff', borderRadius: 3, boxShadow: '0 2px 16px 0 rgba(26,34,54,0.08)', border: '1.5px solid #e3eafc', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <CardContent sx={{ p: 0 }}>
+            <Typography variant="subtitle2" sx={{ color: '#6b7280', fontWeight: 500, mb: 1, letterSpacing: 0.2 }}>Recent Claims</Typography>
+            <Box component="ul" sx={{ m: 0, pl: 2, color: '#1a2236', fontSize: 16 }}>
+              {recentClaims.map((claim, i) => (
+                <li key={i} style={{ marginBottom: 2 }}><b>{claim.caseName}</b> - ${claim.amount} ({claim.peril})<br /><span style={{ fontSize: 13, color: '#888' }}>{new Date(claim.date).toLocaleDateString()}</span></li>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
+      <Box sx={{ height: 400, width: { xs: '100%', md: 1000 }, mx: 'auto', mb: 4, borderRadius: 3, overflow: 'hidden', boxShadow: 2, position: 'relative', background: 'rgba(255,255,255,0.6)' }}>
+        <MapContainer center={[37.8, -119.7]} zoom={6} style={{ height: '100%', width: '100%' }}>
+          <TileLayer
+            attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {/* Show all polygons, color by risk */}
+          {cases.map((c, i) => c.polygon && (
+            <GeoJSON
+              key={i}
+              data={c.polygon}
+              style={{
+                color: c.riskResult && c.riskResult.risk_score > 0.6 ? '#d32f2f' : c.riskResult && c.riskResult.risk_score > 0.3 ? '#fbc02d' : '#388e3c',
+                weight: 3,
+                fillOpacity: 0.3
+              }}
+            />
+          ))}
+          {/* Hotspot markers */}
+          {hotspots.map((c, i) => c.polygon && (
+            <Marker
+              key={i}
+              position={[c.polygon.geometry.coordinates[0][0][1], c.polygon.geometry.coordinates[0][0][0]]}
+              icon={L.divIcon({ className: 'hotspot-marker', html: '<div style="background:#d32f2f;color:white;padding:2px 6px;border-radius:8px;font-size:12px;">Hotspot</div>' })}
+            />
+          ))}
+        </MapContainer>
+      </Box>
+    </Box>
+  );
+}
 
 function App() {
   const [cases, setCases] = useState<CaseData[]>([]);
@@ -87,6 +208,19 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [coverage, setCoverage] = useState(1.0);
+  const [claims, setClaims] = useState<Claim[]>(() => {
+    const saved = localStorage.getItem('agririsk_claims');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [claimForm, setClaimForm] = useState<{ caseName: string; date: string; amount: string; peril: string; notes: string }>({
+    caseName: '',
+    date: '',
+    amount: '',
+    peril: '',
+    notes: ''
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem(CASES_KEY);
@@ -96,6 +230,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(CASES_KEY, JSON.stringify(cases));
   }, [cases]);
+
+  useEffect(() => {
+    localStorage.setItem('agririsk_claims', JSON.stringify(claims));
+  }, [claims]);
 
   const currentCase = selectedIdx !== null ? cases[selectedIdx] : null;
 
@@ -117,7 +255,7 @@ function App() {
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ polygon: geojson }),
+        body: JSON.stringify({ polygon: geojson, coverage }),
       });
       if (!res.ok) throw new Error('Backend error');
       const data = await res.json();
@@ -137,99 +275,24 @@ function App() {
     else if (selectedIdx !== null && idx < selectedIdx) setSelectedIdx(selectedIdx - 1);
   };
 
-  // Home page content
-  const HomePage = () => (
-    <Box
-      sx={{
-        width: '100vw',
-        minHeight: '100vh',
-        height: '100vh',
-        bgcolor: 'background.default',
-        overflowY: 'auto',
-        background: 'linear-gradient(135deg, #f4f6fa 0%, #e3e9f6 100%)',
-      }}
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', py: 8 }}>
-        <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <AgricultureIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h2" sx={{ fontWeight: 800, color: 'primary.main', mb: 1, letterSpacing: 1 }}>
-            Precision AgriRisk
-          </Typography>
-          <Typography variant="h5" sx={{ mb: 2, color: 'text.primary', fontWeight: 500, letterSpacing: 0.5 }}>
-            Underwriter Workbench
-          </Typography>
-          <Typography variant="subtitle1" sx={{ mb: 4, color: 'text.secondary', maxWidth: 500, mx: 'auto', fontSize: 20 }}>
-            The next generation of crop insurance risk assessment.<br />
-            Draw, analyze, and manage field-level risk with geospatial AI.
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            startIcon={<AddIcon />}
-            sx={{ px: 5, py: 2, fontSize: 20, borderRadius: 3, boxShadow: 3 }}
-            onClick={() => setCaseDialogOpen(true)}
-          >
-            Create New Case
-          </Button>
-        </Box>
-        {cases.length > 0 && (
-          <Box sx={{ width: 420, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1, color: 'text.secondary', fontWeight: 600, letterSpacing: 0.5 }}>
-              Recent Cases
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center', maxHeight: 260, overflow: 'auto', p: 1, width: '100%' }}>
-              {cases.slice(-5).reverse().map((c, i) => (
-                <Card
-                  key={i}
-                  sx={{
-                    minWidth: 160,
-                    maxWidth: 180,
-                    p: 1,
-                    borderRadius: 2,
-                    boxShadow: 2,
-                    cursor: 'pointer',
-                    transition: 'box-shadow 0.2s, transform 0.2s',
-                    '&:hover': { boxShadow: 6, transform: 'translateY(-2px) scale(1.03)' },
-                    bgcolor: 'background.paper',
-                  }}
-                  onClick={() => setSelectedIdx(cases.length - 1 - i)}
-                >
-                  <CardContent sx={{ p: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: 18, mb: 0.5 }}>
-                      {c.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(c.created).toLocaleDateString()}<br />
-                      {new Date(c.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
-          </Box>
-        )}
-      </Box>
-    </Box>
-  );
-
   return (
-    <Box sx={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {/* Header */}
-      <AppBar position="absolute" color="primary" elevation={2} sx={{ zIndex: 1201 }}>
+    <Box sx={{ width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* Header with logo */}
+      <AppBar position="absolute" color="default" elevation={2} sx={{ zIndex: 1201, background: '#f8fafc', fontFamily: 'Inter, Roboto, Lato, Arial, sans-serif', borderBottom: '1.5px solid #e3eafc' }}>
         <Toolbar>
+          <img src={logo} alt="Logo" style={{ height: 44, marginRight: 16 }} />
           {currentCase ? (
             <Tooltip title="Home">
-              <IconButton color="inherit" edge="start" sx={{ mr: 2 }} onClick={() => setSelectedIdx(null)}>
+              <IconButton color="primary" edge="start" sx={{ mr: 2, color: '#1a2236' }} onClick={() => setSelectedIdx(null)}>
                 <HomeIcon />
               </IconButton>
             </Tooltip>
           ) : (
-            <IconButton color="inherit" edge="start" sx={{ mr: 2 }} onClick={() => setDrawerOpen(true)}>
+            <IconButton color="primary" edge="start" sx={{ mr: 2, color: '#1a2236' }} onClick={() => setDrawerOpen(true)}>
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h5" sx={{ flexGrow: 1, fontWeight: 700 }}>Precision AgriRisk Underwriter Workbench</Typography>
+          <Typography variant="h5" sx={{ flexGrow: 1, fontWeight: 700 }}></Typography>
           <Typography variant="subtitle1">{currentCase ? currentCase.name : ''}</Typography>
         </Toolbar>
       </AppBar>
@@ -251,20 +314,28 @@ function App() {
           </List>
         </Box>
       </Drawer>
-      {/* Map Fullscreen or Home Page */}
-      {currentCase ? (
-        <Box sx={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 1 }}>
-          <MapContainer center={[37.8, -119.7]} zoom={6} style={{ height: '100%', width: '100%' }}>
-            <TileLayer
-              attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapWithDraw onPolygonDraw={handlePolygonDraw} polygon={currentCase.polygon} />
-          </MapContainer>
-        </Box>
-      ) : (
-        <HomePage />
-      )}
+      {/* Main content area, scrollable */}
+      <Box sx={{ flex: 1, overflow: 'auto', pt: 8 }}>
+        {/* Map or Dashboard */}
+        {currentCase ? (
+          <Box sx={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 1 }}>
+            <MapContainer center={[37.8, -119.7]} zoom={6} style={{ height: '100%', width: '100%' }}>
+              <TileLayer
+                attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MapWithDraw onPolygonDraw={handlePolygonDraw} polygon={currentCase.polygon} />
+            </MapContainer>
+          </Box>
+        ) : (
+          <PortfolioDashboard
+            cases={cases}
+            onNewCase={() => setCaseDialogOpen(true)}
+            claims={claims}
+            onNewClaim={() => setClaimDialogOpen(true)}
+          />
+        )}
+      </Box>
       {/* Results Panel (floating, bottom) */}
       {currentCase && (
         <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1202, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -272,24 +343,52 @@ function App() {
             {loading && <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography>Calculating risk...</Typography></CardContent></Card>}
             {error && <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography color="error">{error}</Typography></CardContent></Card>}
             {currentCase.riskResult && (
-              <Card sx={{ mb: 2, boxShadow: 2 }}>
+              <Card sx={{
+                mb: 2,
+                boxShadow: 2,
+                background: 'rgba(255,255,255,0.4)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(26,34,54,0.08)',
+              }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>{currentCase.name}</Typography>
                   <Typography variant="body2" color="text.secondary">Created: {new Date(currentCase.created).toLocaleString()}</Typography>
                   <Divider sx={{ my: 1 }} />
-                  <Typography variant="subtitle1"><b>Risk Score:</b> {currentCase.riskResult.risk_score}</Typography>
-                  <Typography variant="subtitle1"><b>Premium:</b> ${currentCase.riskResult.premium.toLocaleString()}</Typography>
-                  <Typography variant="subtitle2"><b>Area:</b> {currentCase.riskResult.report.Area_ha} ha ({(currentCase.riskResult.report.Area_ha * 2.47105).toLocaleString(undefined, { maximumFractionDigits: 0 })} acres)</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                    <Typography variant="subtitle1"><b>Risk Score:</b> {currentCase.riskResult.risk_score}</Typography>
+                    <Typography variant="subtitle1"><b>Premium:</b> ${currentCase.riskResult.premium.toLocaleString()}</Typography>
+                    <Typography variant="subtitle2"><b>Coverage:</b></Typography>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={2.0}
+                      step={0.05}
+                      value={coverage}
+                      onChange={e => {
+                        setCoverage(Number(e.target.value));
+                        if (currentCase.polygon) handlePolygonDraw(currentCase.polygon);
+                      }}
+                      style={{ width: 120 }}
+                    />
+                    <span style={{ minWidth: 40, display: 'inline-block', textAlign: 'center' }}>{coverage}x</span>
+                  </Box>
                   <Divider sx={{ my: 1 }} />
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>Breakdown:</Typography>
-                  <ul style={{ margin: 0, paddingLeft: 20 }}>
-                    <li><b>NDVI:</b> {currentCase.riskResult.report.NDVI} <Tooltip title="Normalized Difference Vegetation Index (higher = more vegetation)"><span>[?]</span></Tooltip></li>
-                    <li><b>Elevation:</b> {currentCase.riskResult.report.Elevation_m} m <Tooltip title="Higher elevation usually means less flood risk."><span>[?]</span></Tooltip></li>
-                    <li><b>Weather:</b> {currentCase.riskResult.report.Weather_value} <Tooltip title="Recent rainfall or weather metric (mm)"><span>[?]</span></Tooltip></li>
-                  </ul>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>Multi-Peril Risk Breakdown:</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+                    {currentCase.riskResult && Object.entries(currentCase.riskResult.perils).map(([peril, score]) => (
+                      <Card key={peril} sx={{ minWidth: 140, p: 1, bgcolor: '#f8fafc', borderRadius: 2, boxShadow: 1 }}>
+                        <CardContent sx={{ p: 1 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{peril.charAt(0).toUpperCase() + peril.slice(1)}</Typography>
+                          <Typography variant="h6" color={score > 0.6 ? 'error.main' : score > 0.3 ? 'warning.main' : 'success.main'}>{score}</Typography>
+                          <Typography variant="body2" color="text.secondary">Premium: ${currentCase.riskResult?.peril_premiums[peril]}</Typography>
+                          <Typography variant="caption" color="text.secondary">{currentCase.riskResult?.explanations[peril]}</Typography>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
                   <Divider sx={{ my: 1 }} />
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>Polygon Coordinates:</Typography>
-                  <Box sx={{ fontFamily: 'monospace', fontSize: 12, bgcolor: '#f5f5f5', p: 1, borderRadius: 1, maxHeight: 120, overflow: 'auto' }}>
+                  <Box sx={{ fontFamily: 'monospace', fontSize: 12, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)', border: '1px solid rgba(26,34,54,0.08)', p: 1, borderRadius: 1, maxHeight: 120, overflow: 'auto' }}>
                     {currentCase.polygon && currentCase.polygon.geometry && currentCase.polygon.geometry.coordinates[0].map((coord: number[], idx: number) => (
                       <span key={idx}>({coord[1].toFixed(5)}, {coord[0].toFixed(5)}) </span>
                     ))}
@@ -312,6 +411,79 @@ function App() {
         <DialogActions>
           <Button onClick={() => setCaseDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleNewCase} disabled={!newCaseName.trim()}>Create</Button>
+        </DialogActions>
+      </Dialog>
+      {/* New Claim Dialog */}
+      <Dialog open={claimDialogOpen} onClose={() => setClaimDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>File New Claim</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            select
+            label="Case"
+            value={claimForm.caseName}
+            onChange={e => setClaimForm(f => ({ ...f, caseName: e.target.value }))}
+            SelectProps={{ native: true }}
+            fullWidth
+          >
+            <option value="" disabled>Select a case</option>
+            {cases.map((c, i) => <option key={i} value={c.name}>{c.name}</option>)}
+          </TextField>
+          <TextField
+            label="Date of Event"
+            type="date"
+            value={claimForm.date}
+            onChange={e => setClaimForm(f => ({ ...f, date: e.target.value }))}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+          <TextField
+            select
+            label="Peril"
+            value={claimForm.peril}
+            onChange={e => setClaimForm(f => ({ ...f, peril: e.target.value }))}
+            SelectProps={{ native: true }}
+            fullWidth
+          >
+            <option value="" disabled>Select peril</option>
+            <option value="drought">Drought</option>
+            <option value="flood">Flood</option>
+            <option value="hail">Hail</option>
+            <option value="frost">Frost</option>
+            <option value="pestilence">Pestilence</option>
+          </TextField>
+          <TextField
+            label="Claimed Amount ($)"
+            type="number"
+            value={claimForm.amount}
+            onChange={e => setClaimForm(f => ({ ...f, amount: e.target.value }))}
+            fullWidth
+          />
+          <TextField
+            label="Notes (optional)"
+            value={claimForm.notes}
+            onChange={e => setClaimForm(f => ({ ...f, notes: e.target.value }))}
+            multiline
+            minRows={2}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClaimDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!claimForm.caseName || !claimForm.date || !claimForm.peril || !claimForm.amount}
+            onClick={() => {
+              setClaims([...claims, {
+                caseName: claimForm.caseName,
+                date: claimForm.date,
+                amount: Number(claimForm.amount),
+                peril: claimForm.peril,
+                notes: claimForm.notes
+              }]);
+              setClaimDialogOpen(false);
+              setClaimForm({ caseName: '', date: '', amount: '', peril: '', notes: '' });
+            }}
+          >Submit</Button>
         </DialogActions>
       </Dialog>
     </Box>

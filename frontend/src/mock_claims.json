@@ -1,0 +1,20 @@
+[
+  {
+    "caseName": "North Valley Farm",
+    "date": "2025-07-10T14:00:00Z",
+    "amount": 3200,
+    "peril": "hail"
+  },
+  {
+    "caseName": "Riverbend Fields",
+    "date": "2025-06-28T09:30:00Z",
+    "amount": 2100,
+    "peril": "flood"
+  },
+  {
+    "caseName": "Sunny Acres",
+    "date": "2025-06-15T16:45:00Z",
+    "amount": 1500,
+    "peril": "drought"
+  }
+]
