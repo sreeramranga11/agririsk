@@ -14,7 +14,6 @@ import HomeIcon from '@mui/icons-material/Home';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
-import mockClaims from './mock_claims.json';
 import logo from './logo.png';
 
 interface RiskResult {
@@ -45,9 +44,18 @@ interface Claim {
 const BACKEND_URL = 'http://localhost:8000/risk';
 const CASES_KEY = 'agririsk_cases';
 
-const MapWithDraw = ({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any) => void, polygon: any | null }) => {
+const MapWithDraw = React.forwardRef(({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any) => void, polygon: any | null }, ref) => {
   const featureGroupRef = useRef<L.FeatureGroup>(null);
+  const editControlRef = useRef<any>(null);
   const [latlng, setLatlng] = useState<{ lat: number, lng: number } | null>(null);
+
+  React.useImperativeHandle(ref, () => ({
+    startPolygon() {
+      if (editControlRef.current && editControlRef.current._toolbars && editControlRef.current._toolbars.draw) {
+        editControlRef.current._toolbars.draw._modes.polygon.handler.enable();
+      }
+    }
+  }));
 
   useMapEvents({
     mousemove(e) {
@@ -67,6 +75,7 @@ const MapWithDraw = ({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any)
     <>
       <FeatureGroup ref={featureGroupRef}>
         <EditControl
+          ref={editControlRef}
           position="topright"
           draw={{
             rectangle: false,
@@ -100,7 +109,7 @@ const MapWithDraw = ({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any)
       )}
     </>
   );
-};
+});
 
 function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim, onSelectCase }: { cases: CaseData[], onNewCase: () => void, claims: Claim[], onNewClaim: () => void, onSelectCase: (idx: number) => void }) {
   const [search, setSearch] = useState('');
@@ -172,7 +181,7 @@ function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim, onSelectCase
           </CardContent>
         </Card>
       </Box>
-      <Box sx={{ height: 400, width: { xs: '100%', md: 1000 }, mx: 'auto', mb: 4, borderRadius: 3, overflow: 'hidden', boxShadow: 2, position: 'relative', background: 'rgba(255,255,255,0.6)' }}>
+      <Box sx={{ height: 500, width: { xs: '100%', md: 1250 }, mx: 'auto', mb: 4, borderRadius: 3, overflow: 'hidden', boxShadow: 2, position: 'relative', background: 'rgba(255,255,255,0.6)' }}>
         <MapContainer center={[37.8, -119.7]} zoom={6} style={{ height: '100%', width: '100%' }}>
           <TileLayer
             attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
@@ -299,6 +308,10 @@ function App() {
     notes: ''
   });
   const [panelMinimized, setPanelMinimized] = useState(false);
+  const mapRef = useRef<any>(null);
+  const mapDrawRef = useRef<any>(null);
+  // Track if the polygon is being updated due to coverage change
+  const polygonUpdateRef = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(CASES_KEY);
@@ -323,6 +336,7 @@ function App() {
     setSelectedIdx(cases.length);
     setNewCaseName('');
     setCaseDialogOpen(false);
+    // Removed polygon tool auto-equip from here (now handled by useEffect)
   };
 
   const handlePolygonDraw = async (geojson: any) => {
@@ -330,6 +344,10 @@ function App() {
     setLoading(true);
     setError(null);
     try {
+      // Only delay if this is a new polygon draw, not a coverage adjustment
+      if (!polygonUpdateRef.current) {
+        await new Promise(res => setTimeout(res, 10800));
+      }
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -343,6 +361,7 @@ function App() {
       setError(err.message || 'Unknown error');
     } finally {
       setLoading(false);
+      polygonUpdateRef.current = false; // Reset after any update
     }
   };
 
@@ -352,6 +371,18 @@ function App() {
     if (selectedIdx === idx) setSelectedIdx(null);
     else if (selectedIdx !== null && idx < selectedIdx) setSelectedIdx(selectedIdx - 1);
   };
+
+  useEffect(() => {
+    // Auto-equip polygon tool when a new case is selected and has no polygon
+    if (selectedIdx !== null && cases[selectedIdx] && !cases[selectedIdx].polygon) {
+      // Wait for mapDrawRef to be set and MapWithDraw to be mounted
+      setTimeout(() => {
+        if (mapDrawRef.current && typeof mapDrawRef.current.startPolygon === 'function') {
+          mapDrawRef.current.startPolygon();
+        }
+      }, 100);
+    }
+  }, [selectedIdx, cases]);
 
   return (
     <Box sx={{ width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -402,7 +433,7 @@ function App() {
                 attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <MapWithDraw onPolygonDraw={handlePolygonDraw} polygon={currentCase.polygon} />
+              <MapWithDraw ref={mapDrawRef} onPolygonDraw={handlePolygonDraw} polygon={currentCase.polygon} />
             </MapContainer>
           </Box>
         ) : (
@@ -452,7 +483,10 @@ function App() {
                           value={coverage}
                           onChange={e => {
                             setCoverage(Number(e.target.value));
-                            if (currentCase.polygon) handlePolygonDraw(currentCase.polygon);
+                            if (currentCase.polygon) {
+                              polygonUpdateRef.current = true;
+                              handlePolygonDraw(currentCase.polygon);
+                            }
                           }}
                           style={{ width: 120 }}
                         />
