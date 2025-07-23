@@ -11,6 +11,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import mockClaims from './mock_claims.json';
 import logo from './logo.png';
 
@@ -221,6 +223,7 @@ function App() {
     peril: '',
     notes: ''
   });
+  const [panelMinimized, setPanelMinimized] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(CASES_KEY);
@@ -340,64 +343,73 @@ function App() {
       {currentCase && (
         <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1202, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
           <Box sx={{ width: '90vw', maxWidth: 1200, pointerEvents: 'auto' }}>
-            {loading && <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography>Calculating risk...</Typography></CardContent></Card>}
-            {error && <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography color="error">{error}</Typography></CardContent></Card>}
-            {currentCase.riskResult && (
-              <Card sx={{
-                mb: 2,
-                boxShadow: 2,
-                background: 'rgba(255,255,255,0.4)',
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(26,34,54,0.08)',
-              }}>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>{currentCase.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">Created: {new Date(currentCase.created).toLocaleString()}</Typography>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                    <Typography variant="subtitle1"><b>Risk Score:</b> {currentCase.riskResult.risk_score}</Typography>
-                    <Typography variant="subtitle1"><b>Premium:</b> ${currentCase.riskResult.premium.toLocaleString()}</Typography>
-                    <Typography variant="subtitle2"><b>Coverage:</b></Typography>
-                    <input
-                      type="range"
-                      min={0.5}
-                      max={2.0}
-                      step={0.05}
-                      value={coverage}
-                      onChange={e => {
-                        setCoverage(Number(e.target.value));
-                        if (currentCase.polygon) handlePolygonDraw(currentCase.polygon);
-                      }}
-                      style={{ width: 120 }}
-                    />
-                    <span style={{ minWidth: 40, display: 'inline-block', textAlign: 'center' }}>{coverage}x</span>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>Multi-Peril Risk Breakdown:</Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
-                    {currentCase.riskResult && Object.entries(currentCase.riskResult.perils).map(([peril, score]) => (
-                      <Card key={peril} sx={{ minWidth: 140, p: 1, bgcolor: '#f8fafc', borderRadius: 2, boxShadow: 1 }}>
-                        <CardContent sx={{ p: 1 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{peril.charAt(0).toUpperCase() + peril.slice(1)}</Typography>
-                          <Typography variant="h6" color={score > 0.6 ? 'error.main' : score > 0.3 ? 'warning.main' : 'success.main'}>{score}</Typography>
-                          <Typography variant="body2" color="text.secondary">Premium: ${currentCase.riskResult?.peril_premiums[peril]}</Typography>
-                          <Typography variant="caption" color="text.secondary">{currentCase.riskResult?.explanations[peril]}</Typography>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>Polygon Coordinates:</Typography>
-                  <Box sx={{ fontFamily: 'monospace', fontSize: 12, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)', border: '1px solid rgba(26,34,54,0.08)', p: 1, borderRadius: 1, maxHeight: 120, overflow: 'auto' }}>
-                    {currentCase.polygon && currentCase.polygon.geometry && currentCase.polygon.geometry.coordinates[0].map((coord: number[], idx: number) => (
-                      <span key={idx}>({coord[1].toFixed(5)}, {coord[0].toFixed(5)}) </span>
-                    ))}
-                  </Box>
-                </CardContent>
-              </Card>
-            )}
-            {!currentCase.polygon && (
-              <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography variant="body2" color="text.secondary">Draw a polygon on the map to analyze risk for this case.</Typography></CardContent></Card>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <IconButton size="small" onClick={() => setPanelMinimized(m => !m)}>
+                {panelMinimized ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Box>
+            {!panelMinimized && (
+              <>
+                {loading && <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography>Calculating risk...</Typography></CardContent></Card>}
+                {error && <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography color="error">{error}</Typography></CardContent></Card>}
+                {currentCase.riskResult && (
+                  <Card sx={{
+                    mb: 2,
+                    boxShadow: 2,
+                    background: 'rgba(255,255,255,0.4)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(26,34,54,0.08)',
+                  }}>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>{currentCase.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">Created: {new Date(currentCase.created).toLocaleString()}</Typography>
+                      <Divider sx={{ my: 1 }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                        <Typography variant="subtitle1"><b>Risk Score:</b> {currentCase.riskResult.risk_score}</Typography>
+                        <Typography variant="subtitle1"><b>Premium:</b> ${currentCase.riskResult.premium.toLocaleString()}</Typography>
+                        <Typography variant="subtitle2"><b>Coverage:</b></Typography>
+                        <input
+                          type="range"
+                          min={0.5}
+                          max={2.0}
+                          step={0.05}
+                          value={coverage}
+                          onChange={e => {
+                            setCoverage(Number(e.target.value));
+                            if (currentCase.polygon) handlePolygonDraw(currentCase.polygon);
+                          }}
+                          style={{ width: 120 }}
+                        />
+                        <span style={{ minWidth: 40, display: 'inline-block', textAlign: 'center' }}>{coverage}x</span>
+                      </Box>
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>Multi-Peril Risk Breakdown:</Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+                        {currentCase.riskResult && Object.entries(currentCase.riskResult.perils).map(([peril, score]) => (
+                          <Card key={peril} sx={{ minWidth: 140, p: 1, bgcolor: '#f8fafc', borderRadius: 2, boxShadow: 1 }}>
+                            <CardContent sx={{ p: 1 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{peril.charAt(0).toUpperCase() + peril.slice(1)}</Typography>
+                              <Typography variant="h6" color={score > 0.6 ? 'error.main' : score > 0.3 ? 'warning.main' : 'success.main'}>{score}</Typography>
+                              <Typography variant="body2" color="text.secondary">Premium: ${currentCase.riskResult?.peril_premiums[peril]}</Typography>
+                              <Typography variant="caption" color="text.secondary">{currentCase.riskResult?.explanations[peril]}</Typography>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </Box>
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>Polygon Coordinates:</Typography>
+                      <Box sx={{ fontFamily: 'monospace', fontSize: 12, bgcolor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)', border: '1px solid rgba(26,34,54,0.08)', p: 1, borderRadius: 1, maxHeight: 120, overflow: 'auto' }}>
+                        {currentCase.polygon && currentCase.polygon.geometry && currentCase.polygon.geometry.coordinates[0].map((coord: number[], idx: number) => (
+                          <span key={idx}>({coord[1].toFixed(5)}, {coord[0].toFixed(5)}) </span>
+                        ))}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                )}
+                {!currentCase.polygon && (
+                  <Card sx={{ mb: 2, boxShadow: 2 }}><CardContent><Typography variant="body2" color="text.secondary">Draw a polygon on the map to analyze risk for this case.</Typography></CardContent></Card>
+                )}
+              </>
             )}
           </Box>
         </Box>
