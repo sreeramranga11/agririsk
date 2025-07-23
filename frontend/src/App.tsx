@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
 import {
-  AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemText, Button, Box, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Card, CardContent, Divider, IconButton, Tooltip
+  AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemText, Button, Box, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Card, CardContent, Divider, IconButton, Tooltip, Grid
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -13,6 +13,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SearchIcon from '@mui/icons-material/Search';
 import mockClaims from './mock_claims.json';
 import logo from './logo.png';
 
@@ -102,6 +103,7 @@ const MapWithDraw = ({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any)
 };
 
 function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim }: { cases: CaseData[], onNewCase: () => void, claims: Claim[], onNewClaim: () => void }) {
+  const [search, setSearch] = useState('');
   // Calculate total insured value
   const totalInsured = cases.reduce((sum, c) => sum + (c.riskResult?.premium || 0), 0);
   // Aggregate risk exposure by peril
@@ -197,6 +199,79 @@ function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim }: { cases: C
             />
           ))}
         </MapContainer>
+      </Box>
+      {/* Case Grid View */}
+      <Box sx={{ mt: 4, mb: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2236', mb: 2, letterSpacing: 0.2 }}>All Cases</Typography>
+        {/* Search Bar */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, maxWidth: 400 }}>
+          <SearchIcon sx={{ color: '#6b7280', mr: 1 }} />
+          <TextField
+            variant="outlined"
+            size="small"
+            placeholder="Search cases by name..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            fullWidth
+            sx={{ bgcolor: '#fff', borderRadius: 2 }}
+            inputProps={{ style: { fontSize: 16 } }}
+          />
+        </Box>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr', lg: '1fr 1fr 1fr 1fr' },
+            gap: 3,
+          }}
+        >
+          {cases.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+            <Card sx={{ p: 4, textAlign: 'center', color: '#888', boxShadow: 0, border: '1.5px dashed #e3eafc', bgcolor: '#f8fafc', gridColumn: '1/-1' }}>
+              <Typography variant="body1">No cases found.</Typography>
+            </Card>
+          )}
+          {cases.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map((c, i) => (
+            <Card
+              key={i}
+              sx={{
+                borderRadius: 3,
+                boxShadow: '0 2px 16px 0 rgba(26,34,54,0.08)',
+                border: '1.5px solid #e3eafc',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: 'translateY(-4px) scale(1.03)',
+                  boxShadow: '0 8px 32px 0 rgba(26,34,54,0.16)',
+                },
+                bgcolor: '#fff',
+                p: 2,
+                minHeight: 170,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+              onClick={() => onNewCase ? setTimeout(() => onNewCase(), 0) : undefined}
+            >
+              <Box>
+                <Typography variant="subtitle2" sx={{ color: '#6b7280', fontWeight: 500, mb: 0.5, letterSpacing: 0.2 }}>Case Name</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#1a2236', mb: 0.5 }}>{c.name}</Typography>
+                <Typography variant="caption" color="text.secondary">Created: {new Date(c.created).toLocaleDateString()}</Typography>
+              </Box>
+              <Divider sx={{ my: 1 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>Premium:</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1a2236' }}>${c.riskResult?.premium?.toLocaleString() ?? '--'}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>Risk:</Typography>
+                <Box sx={{
+                  width: 18, height: 18, borderRadius: '50%',
+                  bgcolor: c.riskResult ? (c.riskResult.risk_score > 0.6 ? '#d32f2f' : c.riskResult.risk_score > 0.3 ? '#fbc02d' : '#388e3c') : '#e3eafc',
+                  display: 'inline-block',
+                  border: '2px solid #e3eafc',
+                }} />
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1a2236' }}>{c.riskResult?.risk_score ?? '--'}</Typography>
+              </Box>
+            </Card>
+          ))}
+        </Box>
       </Box>
     </Box>
   );
