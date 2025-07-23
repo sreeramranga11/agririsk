@@ -102,7 +102,7 @@ const MapWithDraw = ({ onPolygonDraw, polygon }: { onPolygonDraw: (geojson: any)
   );
 };
 
-function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim }: { cases: CaseData[], onNewCase: () => void, claims: Claim[], onNewClaim: () => void }) {
+function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim, onSelectCase }: { cases: CaseData[], onNewCase: () => void, claims: Claim[], onNewClaim: () => void, onSelectCase: (idx: number) => void }) {
   const [search, setSearch] = useState('');
   // Calculate total insured value
   const totalInsured = cases.reduce((sum, c) => sum + (c.riskResult?.premium || 0), 0);
@@ -249,7 +249,7 @@ function PortfolioDashboard({ cases, onNewCase, claims, onNewClaim }: { cases: C
                 flexDirection: 'column',
                 justifyContent: 'space-between',
               }}
-              onClick={() => onNewCase ? setTimeout(() => onNewCase(), 0) : undefined}
+              onClick={() => onSelectCase ? onSelectCase(i) : undefined}
             >
               <Box>
                 <Typography variant="subtitle2" sx={{ color: '#6b7280', fontWeight: 500, mb: 0.5, letterSpacing: 0.2 }}>Case Name</Typography>
@@ -411,6 +411,7 @@ function App() {
             onNewCase={() => setCaseDialogOpen(true)}
             claims={claims}
             onNewClaim={() => setClaimDialogOpen(true)}
+            onSelectCase={setSelectedIdx}
           />
         )}
       </Box>
@@ -501,9 +502,9 @@ function App() {
         </DialogActions>
       </Dialog>
       {/* New Claim Dialog */}
-      <Dialog open={claimDialogOpen} onClose={() => setClaimDialogOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={claimDialogOpen} onClose={() => setClaimDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { minHeight: 480 } }}>
         <DialogTitle>File New Claim</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
           <TextField
             select
             label="Case"
@@ -511,6 +512,7 @@ function App() {
             onChange={e => setClaimForm(f => ({ ...f, caseName: e.target.value }))}
             SelectProps={{ native: true }}
             fullWidth
+            InputLabelProps={{ shrink: true }}
           >
             <option value="" disabled>Select a case</option>
             {cases.map((c, i) => <option key={i} value={c.name}>{c.name}</option>)}
@@ -530,6 +532,7 @@ function App() {
             onChange={e => setClaimForm(f => ({ ...f, peril: e.target.value }))}
             SelectProps={{ native: true }}
             fullWidth
+            InputLabelProps={{ shrink: true }}
           >
             <option value="" disabled>Select peril</option>
             <option value="drought">Drought</option>
